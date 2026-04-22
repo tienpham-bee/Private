@@ -139,6 +139,29 @@ export const api = {
   images: {
     generate: (data: { prompt: string; campaign_id?: string; content_piece_id?: string; model?: string }) =>
       request<any>("/images/generate", { method: "POST", body: JSON.stringify(data) }),
+
+    generateFromReference: (formData: FormData) =>
+      fetch(`${API_BASE}/images/generate-from-reference`, { method: "POST", body: formData })
+        .then(async (res) => {
+          if (!res.ok) { const e = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(e.detail || "API error"); }
+          return res.json();
+        }),
+
+    batchGenerate: (data: { prompt: string; count: number; campaign_id?: string; content_piece_id?: string; model?: string }) =>
+      request<any[]>("/images/batch-generate", { method: "POST", body: JSON.stringify(data) }),
+
+    createVariations: (imageId: string, count: number = 2, prompt?: string, model?: string) => {
+      const qs = new URLSearchParams({ count: String(count), ...(prompt ? { prompt } : {}), ...(model ? { model } : {}) }).toString();
+      return request<any[]>(`/images/${imageId}/variations?${qs}`, { method: "POST" });
+    },
+
+    upload: (formData: FormData) =>
+      fetch(`${API_BASE}/images/upload`, { method: "POST", body: formData })
+        .then(async (res) => {
+          if (!res.ok) { const e = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(e.detail || "API error"); }
+          return res.json();
+        }),
+
     list: (params?: { campaign_id?: string; content_piece_id?: string }) => {
       const qs = new URLSearchParams(params as Record<string, string>).toString();
       return request<any[]>(`/images${qs ? `?${qs}` : ""}`);

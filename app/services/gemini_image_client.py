@@ -12,11 +12,9 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Directory to save generated images locally
 GENERATED_IMAGES_DIR = Path(__file__).parent.parent.parent / "generated_images"
 GENERATED_IMAGES_DIR.mkdir(exist_ok=True)
 
-# Imagen models (use generate_images API)
 IMAGEN_MODELS = {
     "imagen-4.0-fast-generate-001",
     "imagen-4.0-generate-001",
@@ -37,26 +35,8 @@ class GeminiImageClient:
             self._client = genai.Client(api_key=self._api_key)
         return self._client
 
-    def generate_image(
-        self,
-        prompt: str,
-        model: str = DEFAULT_MODEL,
-        campaign_id: str | None = None,
-    ) -> dict:
-        """
-        Generate an image using Google AI (Imagen or Gemini native).
-
-        Returns:
-            dict with keys: file_path, file_url, width, height, file_size, mime_type, model
-        """
-        logger.info("Generating image with %s: %.100s...", model, prompt)
-
-        if model in IMAGEN_MODELS:
-            image, response_text = self._generate_with_imagen(prompt, model)
-        else:
-            image, response_text = self._generate_with_gemini_native(prompt, model)
-
-        # Save to local filesystem
+    def _save_and_upload(self, image: Image.Image, campaign_id: str | None) -> dict:
+        """Save PIL image to disk and upload to S3. Returns metadata dict."""
         if campaign_id:
             save_dir = GENERATED_IMAGES_DIR / str(campaign_id)
         else:
@@ -69,11 +49,9 @@ class GeminiImageClient:
         file_path = save_dir / filename
 
         image.save(str(file_path), format="PNG", optimize=True)
-
         file_size = file_path.stat().st_size
         width, height = image.size
 
-        # Try S3 upload, fallback to local URL
         file_url = f"/generated_images/{save_dir.name}/{filename}"
         try:
             from app.services.s3_client import s3_client
@@ -86,46 +64,105 @@ class GeminiImageClient:
                     ContentType="image/png",
                 )
             file_url = f"{settings.s3_public_url}/{settings.s3_bucket_name}/{s3_key}"
-            logger.info("Uploaded to S3: %s", file_url)
         except Exception as e:
             logger.warning("S3 upload skipped (using local): %s", e)
 
-        result = {
+        return {
             "file_path": str(file_path),
             "file_url": file_url,
             "width": width,
             "height": height,
             "file_size": file_size,
             "mime_type": "image/png",
-            "model": model,
-            "response_text": response_text,
         }
 
-        logger.info(
-            "Generated image %dx%d (%d bytes) saved to %s",
-            width, height, file_size, file_path,
-        )
+    def generate_image(
+        self,
+        prompt: str,
+        model: str = DEFAULT_MODEL,
+        campaign_id: str | None = None,
+    ) -> dict:
+        logger.info("Generating image with %s: %.100s...", model, prompt)
+
+        if model in IMAGEN_MODELS:
+            image, response_text = self._generate_with_imagen(prompt, model)
+        else:
+            image, response_text = self._generate_with_gemini_native(prompt, model)
+
+        result = self._save_and_upload(image, campaign_id)
+        result["model"] = model
+        result["response_text"] = response_text
         return result
 
-    def _generate_with_imagen(self, prompt: str, model: str) -> tuple[Image.Image, str | None]:
-        """Use the Imagen API (generate_images endpoint)."""
-        response = self.client.models.generate_images(
+    def generate_from_reference(
+        self,
+        prompt: str,
+        reference_bytes: bytes,
+        reference_mime: str = "image/png",
+        model: str = DEFAULT_MODEL,
+        campaign_id: str | None = None,
+    ) -> dict:
+        """Generate image guided by a reference image (image-to-image)."""
+        logger.info("Generating image from reference with %s: %.80s...", model, prompt)
+
+        if model in IMAGEN_MODELS:
+            # Imagen doesn't support image-to-image via this SDK path, fall back to Gemini native
+            model = DEFAULT_MODEL
+
+        image_part = types.Part.from_bytes(data=reference_bytes, mime_type=reference_mime)
+        response = self.client.models.generate_content(
             model=model,
-            prompt=prompt,
-            config=types.GenerateImagesConfig(
-                number_of_images=1,
+            contents=[image_part, prompt],
+            config=types.GenerateContentConfig(
+                response_modalities=["Image", "Text"],
             ),
         )
 
+        generated_image = None
+        response_text = None
+        for part in response.candidates[0].content.parts:
+            if part.inline_data is not None:
+                generated_image = Image.open(io.BytesIO(part.inline_data.data))
+            elif part.text is not None:
+                response_text = part.text
+
+        if generated_image is None:
+            raise ValueError(f"Gemini không trả về hình ảnh. Response: {response_text}")
+
+        result = self._save_and_upload(generated_image, campaign_id)
+        result["model"] = model
+        result["response_text"] = response_text
+        return result
+
+    def generate_batch(
+        self,
+        prompt: str,
+        count: int = 2,
+        model: str = DEFAULT_MODEL,
+        campaign_id: str | None = None,
+    ) -> list[dict]:
+        """Generate multiple images from the same prompt."""
+        count = max(1, min(count, 4))
+        results = []
+        for i in range(count):
+            logger.info("Batch generating %d/%d", i + 1, count)
+            result = self.generate_image(prompt, model, campaign_id)
+            results.append(result)
+        return results
+
+    def _generate_with_imagen(self, prompt: str, model: str) -> tuple[Image.Image, str | None]:
+        response = self.client.models.generate_images(
+            model=model,
+            prompt=prompt,
+            config=types.GenerateImagesConfig(number_of_images=1),
+        )
         if not response.generated_images:
             raise ValueError("Imagen không trả về hình ảnh nào")
-
         img_data = response.generated_images[0]
         image = Image.open(io.BytesIO(img_data.image.image_bytes))
         return image, None
 
     def _generate_with_gemini_native(self, prompt: str, model: str) -> tuple[Image.Image, str | None]:
-        """Use the Gemini native generation (generate_content with Image modality)."""
         response = self.client.models.generate_content(
             model=model,
             contents=[prompt],
@@ -136,7 +173,6 @@ class GeminiImageClient:
 
         image = None
         response_text = None
-
         for part in response.candidates[0].content.parts:
             if part.inline_data is not None:
                 image = Image.open(io.BytesIO(part.inline_data.data))
@@ -144,9 +180,7 @@ class GeminiImageClient:
                 response_text = part.text
 
         if image is None:
-            raise ValueError(
-                f"Gemini không trả về hình ảnh. Response: {response_text}"
-            )
+            raise ValueError(f"Gemini không trả về hình ảnh. Response: {response_text}")
 
         return image, response_text
 
