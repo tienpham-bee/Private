@@ -1,5 +1,11 @@
 const API_BASE = "/api/v1";
 
+// For multipart/form-data: Next.js rewrite proxy can't forward binary bodies,
+// so we call the backend directly using the public URL set at build time.
+const UPLOAD_BASE = process.env.NEXT_PUBLIC_API_URL
+  ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1`
+  : API_BASE;
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...options?.headers },
@@ -10,6 +16,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(error.detail || "API request failed");
   }
   if (res.status === 204) return undefined as T;
+  return res.json();
+}
+
+async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
+  const res = await fetch(`${UPLOAD_BASE}${path}`, { method: "POST", body: formData });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(error.detail || "Upload failed");
+  }
   return res.json();
 }
 
@@ -141,11 +156,7 @@ export const api = {
       request<any>("/images/generate", { method: "POST", body: JSON.stringify(data) }),
 
     generateFromReference: (formData: FormData) =>
-      fetch(`${API_BASE}/images/generate-from-reference`, { method: "POST", body: formData })
-        .then(async (res) => {
-          if (!res.ok) { const e = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(e.detail || "API error"); }
-          return res.json();
-        }),
+      uploadRequest<any>("/images/generate-from-reference", formData),
 
     batchGenerate: (data: { prompt: string; count: number; campaign_id?: string; content_piece_id?: string; model?: string }) =>
       request<any[]>("/images/batch-generate", { method: "POST", body: JSON.stringify(data) }),
@@ -156,11 +167,7 @@ export const api = {
     },
 
     upload: (formData: FormData) =>
-      fetch(`${API_BASE}/images/upload`, { method: "POST", body: formData })
-        .then(async (res) => {
-          if (!res.ok) { const e = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(e.detail || "API error"); }
-          return res.json();
-        }),
+      uploadRequest<any>("/images/upload", formData),
 
     list: (params?: { campaign_id?: string; content_piece_id?: string }) => {
       const qs = new URLSearchParams(params as Record<string, string>).toString();
