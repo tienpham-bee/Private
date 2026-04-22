@@ -1,0 +1,36 @@
+Create 3-6 social media post ideas for this mobile game marketing campaign.
+
+## Brand
+- Game: {{ game_name }}
+- Tone: {{ tone_of_voice }}
+- Audience: {{ target_audience }}
+
+## Campaign
+- Name: {{ campaign_name }}
+{% if key_message %}- Key message: {{ key_message }}{% endif %}
+{% if objectives %}- Objectives: {{ objectives | join(', ') }}{% endif %}
+{% if product_highlights %}- Highlights: {{ product_highlights | join(', ') }}{% endif %}
+- Platforms: {{ target_platforms | join(', ') }}
+{% if ai_instructions %}- Notes: {{ ai_instructions }}{% endif %}
+
+## Instructions
+Generate exactly 3-6 post ideas. Keep descriptions brief (1-2 sentences).
+Distribute across platforms: {{ target_platforms | join(', ') }}.
+Use content types: social_post, video_script, image_ad, or caption.
+
+Respond ONLY with this JSON (no extra text):
+{
+  "reasoning": "One sentence strategy summary",
+  "phases": ["Main"],
+  "items": [
+    {
+      "phase": "Main",
+      "platform": "facebook",
+      "content_type": "social_post",
+      "topic": "Short topic title",
+      "description": "Brief description 1-2 sentences.",
+      "suggested_date": null,
+      "template_id": null
+    }
+  ]
+}

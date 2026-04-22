@@ -1,0 +1,41 @@
+# Environment variables — KHÔNG push lên GitHub
+.env
+.env.local
+.env.railway
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Generated images (too large for git)
+generated_images/
+
+# Logs
+*.log
+uvicorn.log
+uvicorn2.log
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Alembic
+# (giữ migrations, bỏ cache)
+alembic/__pycache__/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

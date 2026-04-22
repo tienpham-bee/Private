@@ -1,0 +1,22 @@
+# Next.js
+.next/
+out/
+
+# Dependencies
+node_modules/
+
+# Environment variables — KHÔNG push lên GitHub
+.env
+.env.local
+.env.vercel
+.env*.local
+
+# Build
+dist/
+
+# Debug
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "canvas": {"width": 1200, "height": 628},
+  "background": {
+    "type": "gradient",
+    "gradient_start": "#1a0533",
+    "gradient_end": "#0d47a1",
+    "gradient_direction": "vertical"
+  },
+  "layers": [
+    {"type": "overlay", "color": "#00000020"},
+    {
+      "type": "rectangle",
+      "x": 40, "y": 140, "width": 640, "height": 340,
+      "color": "#00000060", "corner_radius": 16
+    },
+    {
+      "type": "text", "field": "headline",
+      "x": 70, "y": 170, "width": 580, "height": 80,
+      "font_family": "NotoSans-Bold", "font_size": 48,
+      "font_color": "#FFFFFF", "alignment": "left",
+      "max_lines": 2, "auto_shrink": true, "min_font_size": 32,
+      "line_spacing": 8,
+      "shadow": {"color": "#00000080", "offset": [2, 2]}
+    },
+    {
+      "type": "text", "field": "subheadline",
+      "x": 70, "y": 270, "width": 580, "height": 60,
+      "font_family": "NotoSans-Regular", "font_size": 26,
+      "font_color": "#E0E0E0", "alignment": "left",
+      "max_lines": 2, "auto_shrink": true, "min_font_size": 18,
+      "line_spacing": 6
+    },
+    {
+      "type": "text", "field": "body_text",
+      "x": 70, "y": 340, "width": 580, "height": 60,
+      "font_family": "NotoSans-Regular", "font_size": 20,
+      "font_color": "#B0B0B0", "alignment": "left",
+      "max_lines": 2, "auto_shrink": true, "min_font_size": 14,
+      "line_spacing": 4
+    },
+    {
+      "type": "cta_button", "field": "cta_text",
+      "x": 70, "y": 410, "width": 240, "height": 52,
+      "bg_color": "#FF6B00", "corner_radius": 26,
+      "font_family": "NotoSans-Bold", "font_size": 22,
+      "font_color": "#FFFFFF"
+    }
+  ]
+}
